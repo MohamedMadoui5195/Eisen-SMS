@@ -77,7 +77,7 @@
   
   <!-- زر الذكاء الاصطناعي العلوي المحدث -->
   <a href="gemalot.html" class="ai-top-btn" title="Ask Gemalot">
-    <span class="top-txt">✨ نجمة الذكاء الاصطناعي</span>
+    <span class="top-txt">✨ </span>
     <span class="sub-txt">Ask Gemalot</span>
   </a>
   
