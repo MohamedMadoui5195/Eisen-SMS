@@ -39,22 +39,26 @@ a{color:#43cafa;text-decoration:none}
 </main>
 
 <script type="module">
-import {initializeApp} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
-import {
- getAuth,signInWithEmailAndPassword,onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
+import { 
+ getAuth, signInWithEmailAndPassword, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-const app=initializeApp({
- apiKey:"AIzaSyDFDCcFgBST43TU1RyfZ3Epvoc2JNxrmoI",
- authDomain:"eisen-sms.firebaseapp.com",
- projectId:"eisen-sms",
- storageBucket:"eisen-sms.firebasestorage.app",
- messagingSenderId:"934543543234",
- appId:"1:934543543234:web:3b8b002767769731f2645b",
- measurementId:"G-71J4KLJ8N5"
-});
+const firebaseConfig = {
+  apiKey: "AIzaSyDFDCcFgBST43TU1RyfZ3Epvoc2JNxrmoI",
+  authDomain: "eisen-sms.firebaseapp.com",
+  projectId: "eisen-sms",
+  storageBucket: "eisen-sms.firebasestorage.app",
+  messagingSenderId: "934543543234",
+  appId: "1:934543543234:web:3b8b002767769731f2645b",
+  measurementId: "G-71J4KLJ8N5"
+};
 
-const auth=getAuth(app);
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const auth = getAuth(app);
+
 const $=id=>document.getElementById(id);
 const message=$("message");
 let submitting=false;
