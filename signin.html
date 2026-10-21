@@ -19,44 +19,33 @@ button{width:100%;padding:14px;margin-top:16px;border:0;border-radius:12px;backg
 button:disabled{opacity:.6}
 a{color:#43cafa;text-decoration:none}
 .message{font-size:14px;line-height:1.8;overflow-wrap:anywhere;margin-top:14px}
-.hidden{display:none!important}
 .footer{margin-top:22px;font-size:12px;color:#8194b3}
-#recaptcha-container{display:flex;justify-content:center;margin-top:12px}
 </style>
 </head>
 <body>
 <main class="card">
 <img src="icon.png" class="logo" alt="Eisen SMS">
 <h1>تسجيل الدخول</h1>
-<p>أدخل رقم هاتفك المسجّل لاستلام رمز التحقق عبر SMS.</p>
+<p>أدخل رقم هاتفك وكلمة المرور.</p>
 
-<form id="phoneForm">
+<form id="form">
 <input id="phone" type="tel" placeholder="+213XXXXXXXXX" autocomplete="tel" required>
-<div id="recaptcha-container"></div>
-<button id="sendButton" type="submit">التحقق من الحساب وإرسال الرمز</button>
+<input id="password" type="password" placeholder="كلمة المرور" autocomplete="current-password" required>
+<button id="submit" type="submit">تسجيل الدخول</button>
 </form>
 
-<form id="verifyForm" class="hidden">
-<input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="رمز التحقق المكوّن من 6 أرقام" maxlength="6" pattern="[0-9]{6}" required>
-<button id="verifyButton" type="submit">تأكيد الرمز والدخول</button>
-<button id="backButton" type="button">تغيير رقم الهاتف</button>
-</form>
-
-<div id="message" class="message" role="status" aria-live="polite"></div>
-<p id="signupLink">ليس لديك حساب؟ <a href="signup.html">أنشئ حسابًا برقم الهاتف</a></p>
+<div id="message" class="message" role="status"></div>
+<p>ليس لديك حساب؟ <a href="signup.html">أنشئ حسابًا برقم الهاتف</a></p>
 <div class="footer">Eisen SMS · مراسلاتك في مكان واحد</div>
 </main>
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
 import {
- getAuth,RecaptchaVerifier,signInWithPhoneNumber,onAuthStateChanged
+ getAuth,signInWithEmailAndPassword,onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import {
- getFirestore,doc,getDoc
-} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 
-const firebaseConfig={
+const app=initializeApp({
  apiKey:"AIzaSyDFDCcFgBST43TU1RyfZ3Epvoc2JNxrmoI",
  authDomain:"eisen-sms.firebaseapp.com",
  projectId:"eisen-sms",
@@ -64,152 +53,57 @@ const firebaseConfig={
  messagingSenderId:"934543543234",
  appId:"1:934543543234:web:3b8b002767769731f2645b",
  measurementId:"G-71J4KLJ8N5"
-};
+});
 
-const app=initializeApp(firebaseConfig);
 const auth=getAuth(app);
-const db=getFirestore(app);
-
 const $=id=>document.getElementById(id);
-let verifier=null,confirmationResult=null,phoneNumber="",busy=false;
+const message=$("message");
+let submitting=false;
 
-function normalizePhone(v){return v.trim().replace(/[\s()-]/g,"");}
-function msg(text,ok=false){
- $("message").textContent=text;
- $("message").style.color=ok?"#61e6a5":"#ffb4b4";
-}
-function resetCaptcha(){
- if(verifier){try{verifier.clear()}catch(e){}}
- verifier=null;
- $("recaptcha-container").innerHTML="";
-}
-function resetForms(){
- confirmationResult=null;
- phoneNumber="";
- $("verifyForm").classList.add("hidden");
- $("phoneForm").classList.remove("hidden");
- $("signupLink").classList.remove("hidden");
- $("code").value="";
- resetCaptcha();
-}
-function errorMessage(e){
- console.error("Firebase:",e.code,e.message);
- const errors={
-  "auth/invalid-phone-number":"رقم الهاتف غير صالح. استخدم مفتاح الدولة مثل +213.",
-  "auth/too-many-requests":"محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.",
-  "auth/quota-exceeded":"تم بلوغ حد رسائل SMS في Firebase.",
-  "auth/captcha-check-failed":"فشل التحقق الأمني. أعد المحاولة.",
-  "auth/invalid-verification-code":"رمز التحقق غير صحيح.",
-  "auth/code-expired":"انتهت صلاحية الرمز. اطلب رمزًا جديدًا.",
-  "permission-denied":"تعذر الوصول إلى سجل الحسابات. تحقق من قواعد Firestore."
- };
- msg(errors[e.code]||("خطأ Firebase: "+(e.code||e.message)));
+function phoneEmail(value){
+ const phone=value.trim().replace(/[\s()-]/g,"");
+ if(!/^\+[1-9]\d{7,14}$/.test(phone)) throw Error("phone");
+ return phone.replace(/\D/g,"")+"@phone.eisen-sms.invalid";
 }
 
-// الجلسة الموجودة بالفعل
 onAuthStateChanged(auth,user=>{
- if(user)location.replace("README.md");
+ if(user) location.replace("README.md");
 });
 
-$("phoneForm").addEventListener("submit",async e=>{
+$("form").addEventListener("submit",async e=>{
  e.preventDefault();
- if(busy)return;
-
- phoneNumber=normalizePhone($("phone").value);
- if(!/^\+[1-9]\d{7,14}$/.test(phoneNumber)){
-  msg("أدخل رقمًا دوليًا صحيحًا، مثل +213XXXXXXXXX.");return;
- }
-
- busy=true;$("sendButton").disabled=true;
+ if(submitting)return;
+ submitting=true;
+ $("submit").disabled=true;
 
  try{
-  msg("جارٍ البحث عن الحساب...");
-  const account=await getDoc(doc(db,"phoneAccounts",phoneNumber));
-
-  if(!account.exists()){
-   msg("الحساب غير موجود. أنشئ حسابًا أولًا برقم الهاتف.");
-   $("signupLink").classList.remove("hidden");
-   return;
-  }
-
-  const data=account.data();
-  if(!data.uid||!data.phone){
-   msg("بيانات الحساب غير مكتملة. يرجى التواصل مع الدعم.");return;
-  }
-
-  const uid=String(data.uid);
-  const storedPhone=normalizePhone(String(data.phone));
-
-  if(storedPhone!==phoneNumber){
-   msg("بيانات رقم الهاتف في سجل الحساب غير متطابقة.");return;
-  }
-
-  // إرسال رمز الهاتف فقط بعد العثور على الحساب
-  verifier=new RecaptchaVerifier(auth,"recaptcha-container",{size:"normal"});
-  await verifier.render();
-
-  msg("الحساب موجود. جارٍ إرسال رمز SMS...");
-  confirmationResult=await signInWithPhoneNumber(auth,phoneNumber,verifier);
-
-  $("phoneForm").classList.add("hidden");
-  $("verifyForm").classList.remove("hidden");
-  $("signupLink").classList.add("hidden");
-  msg("أُرسل الرمز إلى هاتفك. أدخله لإتمام تسجيل الدخول.",true);
-  $("code").focus();
-
- }catch(e){
-  errorMessage(e);resetCaptcha();
- }finally{
-  busy=false;$("sendButton").disabled=false;
- }
-});
-
-$("verifyForm").addEventListener("submit",async e=>{
- e.preventDefault();
- if(busy)return;
- if(!confirmationResult){msg("اطلب رمز تحقق أولًا.");return;}
-
- const code=$("code").value.trim();
- if(!/^\d{6}$/.test(code)){msg("أدخل رمز التحقق المكوّن من 6 أرقام.");return;}
-
- busy=true;$("verifyButton").disabled=true;
-
- try{
-  msg("جارٍ التحقق من الرمز...");
-  const result=await confirmationResult.confirm(code);
-  const user=result.user;
-
-  if(normalizePhone(user.phoneNumber||"")!==phoneNumber){
-   await auth.signOut();
-   resetForms();
-   msg("رقم الهاتف المؤكّد لا يطابق الرقم المطلوب.");
-   return;
-  }
-
-  const account=await getDoc(doc(db,"phoneAccounts",phoneNumber));
-
-  if(!account.exists()||
-     account.data().uid!==user.uid||
-     normalizePhone(account.data().phone||"")!==phoneNumber){
-   await auth.signOut();
-   resetForms();
-   msg("الحساب غير موجود أو بياناته غير متطابقة. أنشئ حسابًا صحيحًا أولًا.");
-   return;
-  }
-
-  msg("تم تسجيل الدخول بنجاح.",true);
+  const email=phoneEmail($("phone").value);
+  await signInWithEmailAndPassword(auth,email,$("password").value);
+  message.style.color="#61e6a5";
+  message.textContent="تم تسجيل الدخول بنجاح...";
   location.replace("README.md");
 
- }catch(e){
-  errorMessage(e);
- }finally{
-  busy=false;$("verifyButton").disabled=false;
- }
-});
+ }catch(error){
+  console.error(error);
+  message.style.color="#ffb4b4";
 
-$("backButton").addEventListener("click",()=>{
- resetForms();
- msg("أدخل رقم الهاتف.");
+  if(error.message==="phone"){
+   message.textContent="أدخل رقم هاتف دوليًا صحيحًا، مثل +213XXXXXXXXX.";
+  }else if(error.code==="auth/network-request-failed"){
+   message.textContent="تعذر الاتصال. تحقق من الإنترنت.";
+  }else if(error.code==="auth/too-many-requests"){
+   message.textContent="محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.";
+  }else if(error.code==="auth/invalid-credential"||
+           error.code==="auth/user-not-found"||
+           error.code==="auth/wrong-password"){
+   message.textContent="بيانات الدخول غير صحيحة أو الحساب غير موجود. تحقق من الرقم وكلمة المرور أو أنشئ حسابًا.";
+  }else{
+   message.textContent="تعذر تسجيل الدخول: "+(error.code||error.message);
+  }
+ }finally{
+  submitting=false;
+  $("submit").disabled=false;
+ }
 });
 </script>
 </body>
