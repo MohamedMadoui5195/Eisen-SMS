@@ -42,7 +42,7 @@ a{color:#43cafa;text-decoration:none}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
 import { 
- getAuth, signInWithEmailAndPassword, onAuthStateChanged 
+ getAuth, signInWithEmailAndPassword 
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -69,10 +69,6 @@ function phoneEmail(value){
  return phone.replace(/\D/g,"")+"@phone.eisen-sms.invalid";
 }
 
-onAuthStateChanged(auth,user=>{
- if(user) location.replace("index.html");
-});
-
 $("form").addEventListener("submit",async e=>{
  e.preventDefault();
  if(submitting)return;
@@ -82,9 +78,13 @@ $("form").addEventListener("submit",async e=>{
  try{
   const email=phoneEmail($("phone").value);
   await signInWithEmailAndPassword(auth,email,$("password").value);
+  
   message.style.color="#61e6a5";
-  message.textContent="تم تسجيل الدخول بنجاح...";
-  location.replace("index.html");
+  message.textContent="تم تسجيل الدخول بنجاح، جاري التحويل...";
+  
+  setTimeout(() => {
+    window.location.replace("index.html");
+  }, 500);
 
  }catch(error){
   console.error(error);
@@ -103,7 +103,7 @@ $("form").addEventListener("submit",async e=>{
   }else{
    message.textContent="تعذر تسجيل الدخول: "+(error.code||error.message);
   }
- }finally{
+  
   submitting=false;
   $("submit").disabled=false;
  }
