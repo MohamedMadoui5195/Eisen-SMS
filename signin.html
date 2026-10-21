@@ -67,7 +67,7 @@ function phoneEmail(value){
 }
 
 onAuthStateChanged(auth,user=>{
- if(user) location.replace("README.md");
+ if(user) location.replace("index.html");
 });
 
 $("form").addEventListener("submit",async e=>{
@@ -81,7 +81,7 @@ $("form").addEventListener("submit",async e=>{
   await signInWithEmailAndPassword(auth,email,$("password").value);
   message.style.color="#61e6a5";
   message.textContent="تم تسجيل الدخول بنجاح...";
-  location.replace("README.md");
+  location.replace("index.html");
 
  }catch(error){
   console.error(error);
