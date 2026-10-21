@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -37,8 +38,8 @@ a{color:#43cafa;text-decoration:none}
 
 <form id="verifyForm" class="hidden">
 <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="رمز التحقق المكوّن من 6 أرقام" maxlength="6" pattern="[0-9]{6}" required>
-<button type="submit" id="verifyButton">تأكيد الرمز والدخول</button>
-<button type="button" id="backButton">تغيير رقم الهاتف</button>
+<button id="verifyButton" type="submit">تأكيد الرمز والدخول</button>
+<button id="backButton" type="button">تغيير رقم الهاتف</button>
 </form>
 
 <div id="message" class="message" role="status" aria-live="polite"></div>
@@ -49,196 +50,166 @@ a{color:#43cafa;text-decoration:none}
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
 import {
- getAuth, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged
+ getAuth,RecaptchaVerifier,signInWithPhoneNumber,onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {
- getFirestore, doc, getDoc
+ getFirestore,doc,getDoc
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 
 const firebaseConfig={
- apiKey:"AIzaSyCNkJaxbQHkv9gntmt0tWdiVPMmjmWg-4g",
- authDomain:"eisen-mail.firebaseapp.com",
- projectId:"eisen-mail",
- storageBucket:"eisen-mail.firebasestorage.app",
- messagingSenderId:"857237566012",
- appId:"1:857237566012:web:6cc98d71ae010cfb2ac939",
- measurementId:"G-RFKFWM4B1Y"
+ apiKey:"AIzaSyDFDCcFgBST43TU1RyfZ3Epvoc2JNxrmoI",
+ authDomain:"eisen-sms.firebaseapp.com",
+ projectId:"eisen-sms",
+ storageBucket:"eisen-sms.firebasestorage.app",
+ messagingSenderId:"934543543234",
+ appId:"1:934543543234:web:3b8b002767769731f2645b",
+ measurementId:"G-71J4KLJ8N5"
 };
 
 const app=initializeApp(firebaseConfig);
 const auth=getAuth(app);
 const db=getFirestore(app);
 
-const phoneForm=document.getElementById("phoneForm");
-const verifyForm=document.getElementById("verifyForm");
-const phoneInput=document.getElementById("phone");
-const codeInput=document.getElementById("code");
-const message=document.getElementById("message");
-const sendButton=document.getElementById("sendButton");
-const verifyButton=document.getElementById("verifyButton");
-const signupLink=document.getElementById("signupLink");
+const $=id=>document.getElementById(id);
+let verifier=null,confirmationResult=null,phoneNumber="",busy=false;
 
-let confirmationResult=null;
-let verifier=null;
-let checkedPhone="";
-let busy=false;
-
-function normalizePhone(value){
- return value.trim().replace(/[\s()-]/g,"");
+function normalizePhone(v){return v.trim().replace(/[\s()-]/g,"");}
+function msg(text,ok=false){
+ $("message").textContent=text;
+ $("message").style.color=ok?"#61e6a5":"#ffb4b4";
 }
-
-function showMessage(text,success=false){
- message.textContent=text;
- message.style.color=success?"#61e6a5":"#ffb4b4";
-}
-
 function resetCaptcha(){
- if(verifier){
-  try{verifier.clear()}catch(e){}
-  verifier=null;
- }
- document.getElementById("recaptcha-container").innerHTML="";
+ if(verifier){try{verifier.clear()}catch(e){}}
+ verifier=null;
+ $("recaptcha-container").innerHTML="";
 }
-
 function resetForms(){
  confirmationResult=null;
- checkedPhone="";
- verifyForm.classList.add("hidden");
- phoneForm.classList.remove("hidden");
- signupLink.classList.remove("hidden");
- codeInput.value="";
+ phoneNumber="";
+ $("verifyForm").classList.add("hidden");
+ $("phoneForm").classList.remove("hidden");
+ $("signupLink").classList.remove("hidden");
+ $("code").value="";
  resetCaptcha();
 }
-
-function showError(error){
+function errorMessage(e){
+ console.error("Firebase:",e.code,e.message);
  const errors={
   "auth/invalid-phone-number":"رقم الهاتف غير صالح. استخدم مفتاح الدولة مثل +213.",
   "auth/too-many-requests":"محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.",
-  "auth/quota-exceeded":"تم بلوغ حد إرسال رسائل SMS في Firebase.",
-  "auth/captcha-check-failed":"فشل التحقق الأمني. حاول مجددًا.",
+  "auth/quota-exceeded":"تم بلوغ حد رسائل SMS في Firebase.",
+  "auth/captcha-check-failed":"فشل التحقق الأمني. أعد المحاولة.",
   "auth/invalid-verification-code":"رمز التحقق غير صحيح.",
   "auth/code-expired":"انتهت صلاحية الرمز. اطلب رمزًا جديدًا.",
-  "permission-denied":"تعذّر الوصول إلى سجل الحسابات. تحقق من قواعد Firestore."
+  "permission-denied":"تعذر الوصول إلى سجل الحسابات. تحقق من قواعد Firestore."
  };
- showMessage(errors[error.code]||"تعذرت العملية. تحقق من اتصال الإنترنت وإعدادات Firebase.");
- console.error(error);
+ msg(errors[e.code]||("خطأ Firebase: "+(e.code||e.message)));
 }
 
-// جلسة صالحة؟ انتقل إلى الرئيسية.
+// الجلسة الموجودة بالفعل
 onAuthStateChanged(auth,user=>{
- if(user){
-  location.replace("README.md");
- }
+ if(user)location.replace("README.md");
 });
 
-phoneForm.addEventListener("submit",async e=>{
+$("phoneForm").addEventListener("submit",async e=>{
  e.preventDefault();
  if(busy)return;
 
- const phone=normalizePhone(phoneInput.value);
- if(!/^\+[1-9]\d{7,14}$/.test(phone)){
-  showMessage("أدخل رقمًا دوليًا صحيحًا، مثل +213XXXXXXXXX.");
-  return;
+ phoneNumber=normalizePhone($("phone").value);
+ if(!/^\+[1-9]\d{7,14}$/.test(phoneNumber)){
+  msg("أدخل رقمًا دوليًا صحيحًا، مثل +213XXXXXXXXX.");return;
  }
 
- busy=true;
- sendButton.disabled=true;
+ busy=true;$("sendButton").disabled=true;
 
  try{
-  showMessage("جارٍ البحث عن حسابك...");
+  msg("جارٍ البحث عن الحساب...");
+  const account=await getDoc(doc(db,"phoneAccounts",phoneNumber));
 
-  const accountRef=doc(db,"phoneAccounts",phone);
-  const accountSnapshot=await getDoc(accountRef);
-
-  if(!accountSnapshot.exists()){
-   showMessage("الحساب غير موجود. أنشئ حسابًا أولًا برقم الهاتف.");
-   signupLink.classList.remove("hidden");
+  if(!account.exists()){
+   msg("الحساب غير موجود. أنشئ حسابًا أولًا برقم الهاتف.");
+   $("signupLink").classList.remove("hidden");
    return;
   }
 
-  checkedPhone=phone;
+  const data=account.data();
+  if(!data.uid||!data.phone){
+   msg("بيانات الحساب غير مكتملة. يرجى التواصل مع الدعم.");return;
+  }
 
-  verifier=new RecaptchaVerifier(auth,"recaptcha-container",{
-   size:"normal"
-  });
+  const uid=String(data.uid);
+  const storedPhone=normalizePhone(String(data.phone));
+
+  if(storedPhone!==phoneNumber){
+   msg("بيانات رقم الهاتف في سجل الحساب غير متطابقة.");return;
+  }
+
+  // إرسال رمز الهاتف فقط بعد العثور على الحساب
+  verifier=new RecaptchaVerifier(auth,"recaptcha-container",{size:"normal"});
   await verifier.render();
 
-  showMessage("الحساب موجود. جارٍ إرسال رمز SMS...");
+  msg("الحساب موجود. جارٍ إرسال رمز SMS...");
+  confirmationResult=await signInWithPhoneNumber(auth,phoneNumber,verifier);
 
-  confirmationResult=await signInWithPhoneNumber(auth,phone,verifier);
+  $("phoneForm").classList.add("hidden");
+  $("verifyForm").classList.remove("hidden");
+  $("signupLink").classList.add("hidden");
+  msg("أُرسل الرمز إلى هاتفك. أدخله لإتمام تسجيل الدخول.",true);
+  $("code").focus();
 
-  phoneForm.classList.add("hidden");
-  verifyForm.classList.remove("hidden");
-  signupLink.classList.add("hidden");
-  showMessage("أُرسل الرمز إلى هاتفك. أدخله لإكمال تسجيل الدخول.",true);
-  codeInput.focus();
-
- }catch(error){
-  showError(error);
-  resetCaptcha();
+ }catch(e){
+  errorMessage(e);resetCaptcha();
  }finally{
-  busy=false;
-  sendButton.disabled=false;
+  busy=false;$("sendButton").disabled=false;
  }
 });
 
-verifyForm.addEventListener("submit",async e=>{
+$("verifyForm").addEventListener("submit",async e=>{
  e.preventDefault();
  if(busy)return;
+ if(!confirmationResult){msg("اطلب رمز تحقق أولًا.");return;}
 
- if(!confirmationResult||!checkedPhone){
-  showMessage("اطلب رمز تحقق جديدًا أولًا.");
-  return;
- }
+ const code=$("code").value.trim();
+ if(!/^\d{6}$/.test(code)){msg("أدخل رمز التحقق المكوّن من 6 أرقام.");return;}
 
- const code=codeInput.value.trim();
- if(!/^\d{6}$/.test(code)){
-  showMessage("أدخل رمز التحقق المكوّن من 6 أرقام.");
-  return;
- }
-
- busy=true;
- verifyButton.disabled=true;
+ busy=true;$("verifyButton").disabled=true;
 
  try{
-  showMessage("جارٍ التحقق من الرمز...");
-
+  msg("جارٍ التحقق من الرمز...");
   const result=await confirmationResult.confirm(code);
-  const confirmedPhone=normalizePhone(result.user.phoneNumber||"");
+  const user=result.user;
 
-  if(confirmedPhone!==checkedPhone){
+  if(normalizePhone(user.phoneNumber||"")!==phoneNumber){
    await auth.signOut();
    resetForms();
-   showMessage("رقم الهاتف المؤكّد لا يطابق الرقم المطلوب.");
+   msg("رقم الهاتف المؤكّد لا يطابق الرقم المطلوب.");
    return;
   }
 
-  // التأكد مجددًا من وجود الحساب.
-  const accountSnapshot=await getDoc(
-   doc(db,"phoneAccounts",confirmedPhone)
-  );
+  const account=await getDoc(doc(db,"phoneAccounts",phoneNumber));
 
-  if(!accountSnapshot.exists()){
+  if(!account.exists()||
+     account.data().uid!==user.uid||
+     normalizePhone(account.data().phone||"")!==phoneNumber){
    await auth.signOut();
    resetForms();
-   showMessage("الحساب غير موجود. أنشئ حسابًا أولًا.");
+   msg("الحساب غير موجود أو بياناته غير متطابقة. أنشئ حسابًا صحيحًا أولًا.");
    return;
   }
 
-  showMessage("تم تسجيل الدخول بنجاح.",true);
+  msg("تم تسجيل الدخول بنجاح.",true);
   location.replace("README.md");
 
- }catch(error){
-  showError(error);
+ }catch(e){
+  errorMessage(e);
  }finally{
-  busy=false;
-  verifyButton.disabled=false;
+  busy=false;$("verifyButton").disabled=false;
  }
 });
 
-document.getElementById("backButton").addEventListener("click",()=>{
+$("backButton").addEventListener("click",()=>{
  resetForms();
- showMessage("أدخل رقم الهاتف.");
+ msg("أدخل رقم الهاتف.");
 });
 </script>
 </body>
