@@ -85,7 +85,7 @@ $("form").addEventListener("submit",async e=>{
   await createUserWithEmailAndPassword(auth,email,password);
   message.style.color="#61e6a5";
   message.textContent="تم إنشاء الحساب بنجاح. جارٍ الانتقال...";
-  location.replace("README.md");
+  location.replace("index.html");
 
  }catch(error){
   const errors={
