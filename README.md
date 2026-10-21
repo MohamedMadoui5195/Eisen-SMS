@@ -122,7 +122,7 @@
   <button class="active" onclick="showList()">📥 الإستقبال</button>
   <button onclick="newChat()">📤 الإرسال</button>
   <button onclick="location.href='Settings.html'">⚙ الإعدادات</button>
-  <a href="gemalot.html" class="ai-item">✨ Gemalot AI</a>
+  <a href="https://mohamedmadoui5195.github.io/Gemalot/" class="ai-item">✨ Gemalot AI</a>
 </nav>
 
 </div><div id="overlay"></div><div id="toastHost"></div>
