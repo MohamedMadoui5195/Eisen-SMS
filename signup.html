@@ -19,30 +19,23 @@ button{width:100%;padding:14px;margin-top:16px;border:0;border-radius:12px;backg
 button:disabled{opacity:.6}
 a{color:#43cafa;text-decoration:none}
 .message{font-size:14px;line-height:1.8;overflow-wrap:anywhere;margin-top:14px}
-.hidden{display:none!important}
 .footer{margin-top:22px;font-size:12px;color:#8194b3}
-#recaptcha-container{display:flex;justify-content:center;margin-top:12px}
 </style>
 </head>
 <body>
 <main class="card">
 <img src="icon.png" class="logo" alt="Eisen SMS">
 <h1>إنشاء حساب جديد</h1>
-<p>أنشئ حسابك برقم هاتفك فقط، دون بريد إلكتروني أو كلمة مرور.</p>
+<p>أنشئ حسابك باستخدام رقم الهاتف وكلمة المرور.</p>
 
-<form id="phoneForm">
+<form id="form">
 <input id="phone" type="tel" placeholder="+213XXXXXXXXX" autocomplete="tel" required>
-<div id="recaptcha-container"></div>
-<button id="sendButton" type="submit">التحقق من الرقم وإرسال الرمز</button>
+<input id="password" type="password" placeholder="كلمة المرور (6 أحرف على الأقل)" minlength="6" autocomplete="new-password" required>
+<input id="confirm" type="password" placeholder="تأكيد كلمة المرور" minlength="6" autocomplete="new-password" required>
+<button id="submit" type="submit">إنشاء الحساب</button>
 </form>
 
-<form id="verifyForm" class="hidden">
-<input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="رمز التحقق المكوّن من 6 أرقام" maxlength="6" pattern="[0-9]{6}" required>
-<button id="verifyButton" type="submit">تأكيد الرمز وإنشاء الحساب</button>
-<button id="backButton" type="button">تغيير رقم الهاتف</button>
-</form>
-
-<div id="message" class="message" role="status" aria-live="polite"></div>
+<div id="message" class="message" role="status"></div>
 <p>لديك حساب بالفعل؟ <a href="signin.html">تسجيل الدخول</a></p>
 <div class="footer">Eisen SMS · مراسلاتك في مكان واحد</div>
 </main>
@@ -50,13 +43,10 @@ a{color:#43cafa;text-decoration:none}
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
 import {
- getAuth,RecaptchaVerifier,signInWithPhoneNumber
+ getAuth,createUserWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import {
- getFirestore,doc,getDoc,setDoc,serverTimestamp
-} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 
-const firebaseConfig={
+const app=initializeApp({
  apiKey:"AIzaSyDFDCcFgBST43TU1RyfZ3Epvoc2JNxrmoI",
  authDomain:"eisen-sms.firebaseapp.com",
  projectId:"eisen-sms",
@@ -64,127 +54,56 @@ const firebaseConfig={
  messagingSenderId:"934543543234",
  appId:"1:934543543234:web:3b8b002767769731f2645b",
  measurementId:"G-71J4KLJ8N5"
-};
+});
 
-const app=initializeApp(firebaseConfig);
 const auth=getAuth(app);
-const db=getFirestore(app);
-
 const $=id=>document.getElementById(id);
-let verifier=null,confirmationResult=null,phoneNumber="",busy=false;
+const message=$("message");
 
-function msg(text,ok=false){
- $("message").textContent=text;
- $("message").style.color=ok?"#61e6a5":"#ffb4b4";
-}
-function normalizePhone(v){return v.trim().replace(/[\s()-]/g,"");}
-function resetCaptcha(){
- if(verifier){try{verifier.clear()}catch(e){}}
- verifier=null;
- $("recaptcha-container").innerHTML="";
-}
-function errorMessage(e){
- console.error("Firebase:",e.code,e.message);
- const errors={
-  "auth/invalid-phone-number":"رقم الهاتف غير صالح. استخدم مفتاح الدولة مثل +213.",
-  "auth/too-many-requests":"محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.",
-  "auth/quota-exceeded":"تم بلوغ حد رسائل SMS في Firebase.",
-  "auth/captcha-check-failed":"فشل التحقق الأمني. أعد المحاولة.",
-  "auth/invalid-verification-code":"رمز التحقق غير صحيح.",
-  "auth/code-expired":"انتهت صلاحية الرمز. اطلب رمزًا جديدًا.",
-  "permission-denied":"رفضت قواعد Firestore العملية. تحقق من صلاحيات قاعدة البيانات."
- };
- msg((errors[e.code]||("خطأ Firebase: "+(e.code||e.message))));
+function phoneEmail(value){
+ const phone=value.trim().replace(/[\s()-]/g,"");
+ if(!/^\+[1-9]\d{7,14}$/.test(phone)) throw Error("phone");
+ return phone.replace(/\D/g,"")+"@phone.eisen-sms.invalid";
 }
 
-$("phoneForm").addEventListener("submit",async e=>{
+$("form").addEventListener("submit",async e=>{
  e.preventDefault();
- if(busy)return;
- phoneNumber=normalizePhone($("phone").value);
-
- if(!/^\+[1-9]\d{7,14}$/.test(phoneNumber)){
-  msg("أدخل رقمًا دوليًا صحيحًا، مثل +213XXXXXXXXX.");return;
- }
-
- busy=true;$("sendButton").disabled=true;
+ const button=$("submit");
+ button.disabled=true;
 
  try{
-  msg("جارٍ التحقق من الرقم...");
-  const ref=doc(db,"phoneAccounts",phoneNumber);
-  const existing=await getDoc(ref);
+  const email=phoneEmail($("phone").value);
+  const password=$("password").value;
 
-  if(existing.exists()){
-   msg("هذا الرقم مسجّل بالفعل. انتقل إلى تسجيل الدخول.");return;
+  if(password.length<6){
+   throw {code:"weak-password"};
+  }
+  if(password!==$("confirm").value){
+   throw {code:"password-mismatch"};
   }
 
-  verifier=new RecaptchaVerifier(auth,"recaptcha-container",{size:"normal"});
-  await verifier.render();
-
-  msg("جارٍ إرسال رمز SMS...");
-  confirmationResult=await signInWithPhoneNumber(auth,phoneNumber,verifier);
-
-  $("phoneForm").classList.add("hidden");
-  $("verifyForm").classList.remove("hidden");
-  msg("أُرسل الرمز إلى هاتفك. أدخله لإكمال التسجيل.",true);
-  $("code").focus();
- }catch(e){
-  errorMessage(e);resetCaptcha();
- }finally{
-  busy=false;$("sendButton").disabled=false;
- }
-});
-
-$("verifyForm").addEventListener("submit",async e=>{
- e.preventDefault();
- if(busy)return;
- if(!confirmationResult){msg("اطلب رمز التحقق أولًا.");return;}
-
- const code=$("code").value.trim();
- if(!/^\d{6}$/.test(code)){msg("أدخل الرمز المكوّن من 6 أرقام.");return;}
-
- busy=true;$("verifyButton").disabled=true;
-
- try{
-  msg("جارٍ تأكيد رقم الهاتف...");
-  const result=await confirmationResult.confirm(code);
-  const user=result.user;
-
-  if(normalizePhone(user.phoneNumber||"")!==phoneNumber){
-   await auth.signOut();
-   msg("رقم الهاتف المؤكد غير مطابق.");return;
-  }
-
-  const ref=doc(db,"phoneAccounts",phoneNumber);
-  const existing=await getDoc(ref);
-
-  if(existing.exists()){
-   msg("الحساب موجود بالفعل. يمكنك تسجيل الدخول.");
-   await auth.signOut();
-   return;
-  }
-
-  await setDoc(ref,{
-   phone:phoneNumber,
-   uid:user.uid,
-   createdAt:serverTimestamp()
-  });
-
-  msg("تم إنشاء الحساب بنجاح!",true);
+  await createUserWithEmailAndPassword(auth,email,password);
+  message.style.color="#61e6a5";
+  message.textContent="تم إنشاء الحساب بنجاح. جارٍ الانتقال...";
   location.replace("README.md");
- }catch(e){
-  errorMessage(e);
- }finally{
-  busy=false;$("verifyButton").disabled=false;
- }
-});
 
-$("backButton").addEventListener("click",()=>{
- confirmationResult=null;
- $("verifyForm").classList.add("hidden");
- $("phoneForm").classList.remove("hidden");
- $("code").value="";
- resetCaptcha();
- msg("أدخل رقم الهاتف.");
+ }catch(error){
+  const errors={
+   "phone":"أدخل رقم هاتف دوليًا صحيحًا، مثل +213XXXXXXXXX.",
+   "weak-password":"كلمة المرور يجب أن تتكون من 6 أحرف على الأقل.",
+   "password-mismatch":"كلمتا المرور غير متطابقتين.",
+   "auth/email-already-in-use":"هذا الرقم لديه حساب بالفعل. سجّل الدخول.",
+   "auth/invalid-email":"تعذر قبول بيانات الحساب.",
+   "auth/operation-not-allowed":"فعّل Email/Password من Firebase Authentication.",
+   "auth/weak-password":"كلمة المرور ضعيفة؛ استخدم 6 أحرف على الأقل.",
+   "auth/network-request-failed":"تحقق من اتصال الإنترنت."
+  };
+  message.style.color="#ffb4b4";
+  message.textContent=errors[error.code]||("تعذر إنشاء الحساب: "+(error.code||error.message));
+  console.error(error);
+ }finally{
+  button.disabled=false;
+ }
 });
 </script>
 </body>
