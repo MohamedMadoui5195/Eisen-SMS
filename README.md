@@ -76,7 +76,7 @@
   </div>
   
   <!-- زر الذكاء الاصطناعي العلوي المحدث -->
-  <a href="gemalot.html" class="ai-top-btn" title="Ask Gemalot">
+  <a href="https://mohamedmadoui5195.github.io/Gemalot/" class="ai-top-btn" title="Ask Gemalot">
     <span class="top-txt">✨ </span>
     <span class="sub-txt">Ask Gemalot</span>
   </a>
