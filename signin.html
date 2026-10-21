@@ -3,36 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Eisen SMS — إنشاء حساب</title>
+<title>Eisen SMS — تسجيل الدخول</title>
 <link rel="icon" href="icon.png">
-
 <style>
 *{box-sizing:border-box}
-body{
- margin:0;min-height:100vh;display:grid;place-items:center;
- padding:20px;font-family:Arial,sans-serif;color:#fff;
- background:linear-gradient(145deg,#030814,#061a3a,#0b2a5b)
-}
-.card{
- width:100%;max-width:400px;padding:28px 23px;
- border:1px solid #244775;border-radius:22px;
- background:#07152bef;box-shadow:0 20px 60px #0007;text-align:center
-}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;font-family:Arial,sans-serif;color:#fff;background:linear-gradient(145deg,#030814,#061a3a,#0b2a5b)}
+.card{width:100%;max-width:400px;padding:28px 23px;border:1px solid #244775;border-radius:22px;background:#07152bef;box-shadow:0 20px 60px #0007;text-align:center}
 .logo{width:76px;height:76px;object-fit:contain;border-radius:18px}
 h1{font-size:25px;margin:16px 0 8px}
 p{color:#b3c3dc;font-size:14px;line-height:1.8}
-input{
- width:100%;padding:14px;margin-top:13px;
- border:1px solid #29466e;border-radius:12px;
- background:#091a35;color:white;font-size:16px;outline:none
-}
+input{width:100%;padding:14px;margin-top:13px;border:1px solid #29466e;border-radius:12px;background:#091a35;color:white;font-size:16px;outline:none}
 input:focus{border-color:#35c9f4}
-button{
- width:100%;padding:14px;margin-top:16px;border:0;
- border-radius:12px;background:linear-gradient(90deg,#087bdc,#21c4e8);
- color:white;font-size:16px;font-weight:bold;cursor:pointer
-}
-button:disabled{opacity:.6;cursor:wait}
+button{width:100%;padding:14px;margin-top:16px;border:0;border-radius:12px;background:linear-gradient(90deg,#087bdc,#21c4e8);color:white;font-size:16px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.6}
 a{color:#43cafa;text-decoration:none}
 .message{font-size:14px;line-height:1.8;overflow-wrap:anywhere;margin-top:14px}
 .hidden{display:none!important}
@@ -40,51 +23,36 @@ a{color:#43cafa;text-decoration:none}
 #recaptcha-container{display:flex;justify-content:center;margin-top:12px}
 </style>
 </head>
-
 <body>
 <main class="card">
- <img src="icon.png" class="logo" alt="Eisen SMS">
- <h1>إنشاء حساب جديد</h1>
- <p>أنشئ حسابك باستخدام رقم هاتفك فقط، دون بريد إلكتروني أو كلمة مرور.</p>
+<img src="icon.png" class="logo" alt="Eisen SMS">
+<h1>تسجيل الدخول</h1>
+<p>أدخل رقم هاتفك المسجّل لاستلام رمز التحقق عبر SMS.</p>
 
- <form id="phoneForm">
-  <input id="phone" type="tel"
-   placeholder="+213XXXXXXXXX" autocomplete="tel" required>
-  <div id="recaptcha-container"></div>
-  <button id="sendButton" type="submit">التحقق من الرقم وإرسال الرمز</button>
- </form>
+<form id="phoneForm">
+<input id="phone" type="tel" placeholder="+213XXXXXXXXX" autocomplete="tel" required>
+<div id="recaptcha-container"></div>
+<button id="sendButton" type="submit">التحقق من الحساب وإرسال الرمز</button>
+</form>
 
- <form id="verifyForm" class="hidden">
-  <input id="code" type="text" inputmode="numeric"
-   autocomplete="one-time-code"
-   placeholder="رمز التحقق المكوّن من 6 أرقام"
-   maxlength="6" pattern="[0-9]{6}" required>
-  <button type="submit" id="verifyButton">تأكيد الرمز وإنشاء الحساب</button>
-  <button type="button" id="backButton">تغيير رقم الهاتف</button>
- </form>
+<form id="verifyForm" class="hidden">
+<input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="رمز التحقق المكوّن من 6 أرقام" maxlength="6" pattern="[0-9]{6}" required>
+<button type="submit" id="verifyButton">تأكيد الرمز والدخول</button>
+<button type="button" id="backButton">تغيير رقم الهاتف</button>
+</form>
 
- <div id="message" class="message" role="status" aria-live="polite"></div>
-
- <p>لديك حساب بالفعل؟ <a href="signin.html">تسجيل الدخول</a></p>
- <div class="footer">Eisen SMS · مراسلاتك في مكان واحد</div>
+<div id="message" class="message" role="status" aria-live="polite"></div>
+<p id="signupLink">ليس لديك حساب؟ <a href="signup.html">أنشئ حسابًا برقم الهاتف</a></p>
+<div class="footer">Eisen SMS · مراسلاتك في مكان واحد</div>
 </main>
 
 <script type="module">
-import {initializeApp} from
- "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
-
+import {initializeApp} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
 import {
- getAuth,
- RecaptchaVerifier,
- signInWithPhoneNumber
+ getAuth, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-
 import {
- getFirestore,
- doc,
- getDoc,
- setDoc,
- serverTimestamp
+ getFirestore, doc, getDoc
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 
 const firebaseConfig={
@@ -108,6 +76,7 @@ const codeInput=document.getElementById("code");
 const message=document.getElementById("message");
 const sendButton=document.getElementById("sendButton");
 const verifyButton=document.getElementById("verifyButton");
+const signupLink=document.getElementById("signupLink");
 
 let confirmationResult=null;
 let verifier=null;
@@ -131,41 +100,44 @@ function resetCaptcha(){
  document.getElementById("recaptcha-container").innerHTML="";
 }
 
-function showError(error){
- console.error(error);
-
- const errors={
-  "auth/invalid-phone-number":"رقم الهاتف غير صالح. استخدم مفتاح الدولة، مثل +213.",
-  "auth/too-many-requests":"محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.",
-  "auth/quota-exceeded":"تم بلوغ حد رسائل SMS المسموح به في Firebase.",
-  "auth/captcha-check-failed":"فشل التحقق الأمني. حاول مجددًا.",
-  "auth/invalid-verification-code":"رمز التحقق غير صحيح.",
-  "auth/code-expired":"انتهت صلاحية الرمز. أعد طلب رمز جديد.",
-  "auth/phone-number-already-exists":"هذا الرقم مرتبط بحساب موجود. سجّل الدخول بدلًا من إنشاء حساب جديد.",
-  "permission-denied":"تعذر الوصول إلى قاعدة البيانات. تحقق من قواعد Firestore."
- };
-
- showMessage(errors[error.code]||
-  "تعذرت العملية. تحقق من اتصال الإنترنت وإعدادات Firebase.");
-}
-
 function resetForms(){
  confirmationResult=null;
  checkedPhone="";
  verifyForm.classList.add("hidden");
  phoneForm.classList.remove("hidden");
+ signupLink.classList.remove("hidden");
  codeInput.value="";
  resetCaptcha();
 }
+
+function showError(error){
+ const errors={
+  "auth/invalid-phone-number":"رقم الهاتف غير صالح. استخدم مفتاح الدولة مثل +213.",
+  "auth/too-many-requests":"محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.",
+  "auth/quota-exceeded":"تم بلوغ حد إرسال رسائل SMS في Firebase.",
+  "auth/captcha-check-failed":"فشل التحقق الأمني. حاول مجددًا.",
+  "auth/invalid-verification-code":"رمز التحقق غير صحيح.",
+  "auth/code-expired":"انتهت صلاحية الرمز. اطلب رمزًا جديدًا.",
+  "permission-denied":"تعذّر الوصول إلى سجل الحسابات. تحقق من قواعد Firestore."
+ };
+ showMessage(errors[error.code]||"تعذرت العملية. تحقق من اتصال الإنترنت وإعدادات Firebase.");
+ console.error(error);
+}
+
+// جلسة صالحة؟ انتقل إلى الرئيسية.
+onAuthStateChanged(auth,user=>{
+ if(user){
+  location.replace("README.md");
+ }
+});
 
 phoneForm.addEventListener("submit",async e=>{
  e.preventDefault();
  if(busy)return;
 
  const phone=normalizePhone(phoneInput.value);
-
  if(!/^\+[1-9]\d{7,14}$/.test(phone)){
-  showMessage("أدخل رقم هاتف دوليًا صحيحًا، مثل +213XXXXXXXXX.");
+  showMessage("أدخل رقمًا دوليًا صحيحًا، مثل +213XXXXXXXXX.");
   return;
  }
 
@@ -173,14 +145,14 @@ phoneForm.addEventListener("submit",async e=>{
  sendButton.disabled=true;
 
  try{
-  showMessage("جارٍ التحقق من أن رقم الهاتف غير مسجل...");
+  showMessage("جارٍ البحث عن حسابك...");
 
-  // نفس مجموعة الحسابات التي تستخدمها signin.html
   const accountRef=doc(db,"phoneAccounts",phone);
   const accountSnapshot=await getDoc(accountRef);
 
-  if(accountSnapshot.exists()){
-   showMessage("هذا الرقم لديه حساب بالفعل. انتقل إلى تسجيل الدخول.");
+  if(!accountSnapshot.exists()){
+   showMessage("الحساب غير موجود. أنشئ حسابًا أولًا برقم الهاتف.");
+   signupLink.classList.remove("hidden");
    return;
   }
 
@@ -189,19 +161,16 @@ phoneForm.addEventListener("submit",async e=>{
   verifier=new RecaptchaVerifier(auth,"recaptcha-container",{
    size:"normal"
   });
-
   await verifier.render();
 
-  showMessage("جارٍ إرسال رمز التحقق عبر SMS...");
+  showMessage("الحساب موجود. جارٍ إرسال رمز SMS...");
 
-  confirmationResult=await signInWithPhoneNumber(
-   auth,phone,verifier
-  );
+  confirmationResult=await signInWithPhoneNumber(auth,phone,verifier);
 
   phoneForm.classList.add("hidden");
   verifyForm.classList.remove("hidden");
-
-  showMessage("أُرسل الرمز إلى هاتفك. أدخله لإكمال التسجيل.",true);
+  signupLink.classList.add("hidden");
+  showMessage("أُرسل الرمز إلى هاتفك. أدخله لإكمال تسجيل الدخول.",true);
   codeInput.focus();
 
  }catch(error){
@@ -218,12 +187,11 @@ verifyForm.addEventListener("submit",async e=>{
  if(busy)return;
 
  if(!confirmationResult||!checkedPhone){
-  showMessage("اطلب رمز تحقق أولًا.");
+  showMessage("اطلب رمز تحقق جديدًا أولًا.");
   return;
  }
 
  const code=codeInput.value.trim();
-
  if(!/^\d{6}$/.test(code)){
   showMessage("أدخل رمز التحقق المكوّن من 6 أرقام.");
   return;
@@ -233,38 +201,31 @@ verifyForm.addEventListener("submit",async e=>{
  verifyButton.disabled=true;
 
  try{
-  showMessage("جارٍ تأكيد رقم الهاتف...");
+  showMessage("جارٍ التحقق من الرمز...");
 
   const result=await confirmationResult.confirm(code);
-  const user=result.user;
+  const confirmedPhone=normalizePhone(result.user.phoneNumber||"");
 
-  if(normalizePhone(user.phoneNumber||"")!==checkedPhone){
+  if(confirmedPhone!==checkedPhone){
    await auth.signOut();
-   showMessage("رقم الهاتف المؤكد لا يطابق الرقم المطلوب.");
    resetForms();
+   showMessage("رقم الهاتف المؤكّد لا يطابق الرقم المطلوب.");
    return;
   }
 
-  // لا تنشئ سجلًا لرقم مختلف عن الرقم الذي تم تأكيده.
-  const accountRef=doc(db,"phoneAccounts",checkedPhone);
-  const accountSnapshot=await getDoc(accountRef);
+  // التأكد مجددًا من وجود الحساب.
+  const accountSnapshot=await getDoc(
+   doc(db,"phoneAccounts",confirmedPhone)
+  );
 
-  if(accountSnapshot.exists()){
-   showMessage("الحساب موجود بالفعل. سجّل الدخول.");
+  if(!accountSnapshot.exists()){
    await auth.signOut();
    resetForms();
+   showMessage("الحساب غير موجود. أنشئ حسابًا أولًا.");
    return;
   }
 
-  // إنشاء سجل الحساب بعد نجاح التحقق من الهاتف.
-  await setDoc(accountRef,{
-   phone:checkedPhone,
-   uid:user.uid,
-   createdAt:serverTimestamp()
-  });
-
-  showMessage("تم إنشاء حسابك وتأكيد رقم هاتفك بنجاح.",true);
-
+  showMessage("تم تسجيل الدخول بنجاح.",true);
   location.replace("README.md");
 
  }catch(error){
@@ -277,7 +238,7 @@ verifyForm.addEventListener("submit",async e=>{
 
 document.getElementById("backButton").addEventListener("click",()=>{
  resetForms();
- showMessage("أدخل رقم الهاتف الذي تريد التسجيل به.");
+ showMessage("أدخل رقم الهاتف.");
 });
 </script>
 </body>
