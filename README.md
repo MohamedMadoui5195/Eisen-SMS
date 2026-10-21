@@ -18,13 +18,30 @@
 <div class="hint" id="globalHint">تبادل الرسائل يتطلب اتصالاً بالإنترنت وتفعيل Firebase Authentication (Phone) وCloud Firestore. لا يمكن لصفحة ويب إرسال SMS عادية إلى شبكات الهاتف مباشرة.</div>
 <nav class="bottom"><button class="active" onclick="showList()">✉ المحادثات</button><button onclick="location.href='Settings.html'">⚙ الإعدادات</button></nav>
 </div><div id="overlay"></div><div id="toastHost"></div>
+
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import { getFirestore, collection, query, where, orderBy, onSnapshot, getDocs, addDoc, doc, setDoc, serverTimestamp, limit } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
-const firebaseConfig={apiKey:"AIzaSyCNkJaxbQHkv9gntmt0tWdiVPMmjmWg-4g",authDomain:"eisen-mail.firebaseapp.com",projectId:"eisen-mail",storageBucket:"eisen-mail.firebasestorage.app",messagingSenderId:"857237566012",appId:"1:857237566012:web:6cc98d71ae010cfb2ac939",measurementId:"G-RFKFWM4B1Y"};
-const appFirebase=initializeApp(firebaseConfig),auth=getAuth(appFirebase),db=getFirestore(appFirebase);
-const $=id=>document.getElementById(id);let me=null,people=[],active=null,unsubs=[],msgUnsub=null,cache=JSON.parse(localStorage.getItem("eisen_sms_cache")||"{}");
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, query, where, orderBy, onSnapshot, getDocs, addDoc, doc, setDoc, serverTimestamp, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// تم استخدام نفس إعدادات المشروع التي كانت في صفحة تسجيل الدخول بالضبط (eisen-sms)
+const firebaseConfig = {
+  apiKey: "AIzaSyDFDCcFgBST43TU1RyfZ3Epvoc2JNxrmoI",
+  authDomain: "eisen-sms.firebaseapp.com",
+  projectId: "eisen-sms",
+  storageBucket: "eisen-sms.firebasestorage.app",
+  messagingSenderId: "934543543234",
+  appId: "1:934543543234:web:3b8b002767769731f2645b",
+  measurementId: "G-71J4KLJ8N5"
+};
+
+const appFirebase = initializeApp(firebaseConfig);
+const auth = getAuth(appFirebase);
+const db = getFirestore(appFirebase);
+
+const $=id=>document.getElementById(id);
+let me=null,people=[],active=null,unsubs=[],msgUnsub=null,cache=JSON.parse(localStorage.getItem("eisen_sms_cache")||"{}");
+
 function toast(s){$("toastHost").innerHTML=`<div class="toast">${esc(s)}</div>`;setTimeout(()=>$("toastHost").innerHTML="",3200)}
 function esc(s=""){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function phone(){return me?.phoneNumber||""}
@@ -32,14 +49,122 @@ function displayName(p){return p?.displayName||p?.phoneNumber||p?.phone||"مست
 function persist(){localStorage.setItem("eisen_sms_cache",JSON.stringify(cache))}
 function showList(){$("app").classList.remove("thread-open");}
 window.showList=showList;
-function modal(title,body,submitText,fn){$("overlay").innerHTML=`<div class="modalback"><div class="modal"><h3>${title}</h3>${body}<div class="modalactions"><button class="secondary" id="cancelModal">إلغاء</button><button class="primary" id="submitModal">${submitText}</button></div></div></div>`;$("cancelModal").onclick=()=>$("overlay").innerHTML="";$("submitModal").onclick=async()=>{try{await fn();}catch(e){toast(errorText(e))}}}
-function errorText(e){const c=e?.code||"";return ({ "permission-denied":"لا توجد صلاحية. تحقق من قواعد Firestore.","unavailable":"تعذّر الاتصال. تحقق من الإنترنت.","failed-precondition":"تأكد من إعداد فهارس Firestore.","auth/network-request-failed":"تعذّر الاتصال بخدمة تسجيل الدخول."})[c]||e?.message||"حدث خطأ غير متوقع."}
-function start(){onAuthStateChanged(auth,user=>{me=user;if(!user){location.replace("signin.html");return}$("accountLabel").textContent=phone()||"حسابك";$("welcome").style.display="none";$("globalHint").textContent="أرسل واستقبل الرسائل بين حسابات Eisen SMS المسجّلة. تأكد من إعداد Firestore Rules قبل الاستخدام.";loadChats()})}
-function loadChats(){unsubs.forEach(f=>f());unsubs=[];const q1=query(collection(db,"chats"),where("members","array-contains",me.uid),orderBy("updatedAt","desc"),limit(100));const unsub=onSnapshot(q1,snap=>{people=snap.docs.map(d=>({id:d.id,...d.data()}));renderChats()},err=>{$("chatList").innerHTML=`<div class="empty">${esc(errorText(err))}<br>راجع إعدادات Firestore.</div>`});unsubs.push(unsub)}
-function renderChats(){const term=$("searchChats").value.trim().toLowerCase();const rows=people.filter(c=>(c.memberPhones||[]).join(" ").toLowerCase().includes(term)||(c.memberNames||[]).join(" ").toLowerCase().includes(term));if(!rows.length){$("chatList").innerHTML='<div class="empty">لا توجد محادثات بعد.<br>اضغط «＋ محادثة» للبدء.</div>';return}$("chatList").innerHTML=rows.map(c=>{const other=(c.memberPhones||[]).find(p=>p!==phone())||"محادثة";const title=(c.memberNames||[]).find((n,i)=>(c.memberPhones||[])[i]!==phone())||other;return `<div class="chatitem ${active?.id===c.id?"active":""}" data-id="${esc(c.id)}"><div class="avatar">${esc((title[0]||"E").toUpperCase())}</div><div class="chatmeta"><strong>${esc(title)}</strong><small>${esc(c.lastMessage||"ابدأ المحادثة")}</small></div></div>`}).join("");document.querySelectorAll(".chatitem").forEach(el=>el.onclick=()=>openChat(el.dataset.id))}
-async function newChat(){modal("محادثة جديدة",'<label class="field">رقم هاتف المستخدم مع رمز الدولة<input id="newPhone" placeholder="+213555123456" inputmode="tel" dir="ltr" required></label><p style="color:#91a6c0;font-size:12px;line-height:1.7">يجب أن يكون الرقم مسجلاً في Eisen SMS. اكتب الرقم كاملاً مع رمز الدولة.</p>',"متابعة",async()=>{const raw=$("newPhone").value.trim().replace(/[\s()-]/g,"");if(!/^\+[1-9]\d{7,14}$/.test(raw))throw new Error("أدخل رقم هاتف دولياً صحيحاً مثل +213XXXXXXXXX");if(raw===phone())throw new Error("لا يمكنك بدء محادثة مع رقمك نفسه.");const qs=await getDocs(query(collection(db,"users"),where("phoneNumber","==",raw),limit(1)));if(qs.empty)throw new Error("لم نعثر على حساب مسجّل بهذا الرقم.");const target=qs.docs[0].data(),targetUid=qs.docs[0].id;const members=[me.uid,targetUid].sort();const id=members.join("_");const phones=[phone(),raw],names=[me.displayName||phone(),target.displayName||raw];await setDoc(doc(db,"chats",id),{members,memberPhones:phones,memberNames:names,updatedAt:serverTimestamp(),lastMessage:""} ,{merge:true});$("overlay").innerHTML="";await openChat(id);toast("تم فتح المحادثة")})}
-async function openChat(id){active=people.find(c=>c.id===id)||{id};$("app").classList.add("thread-open");if(msgUnsub)msgUnsub();const c=active,other=(c.memberPhones||[]).find(p=>p!==phone())||"محادثة";const title=(c.memberNames||[]).find((n,i)=>(c.memberPhones||[])[i]!==phone())||other;$("thread").innerHTML=`<div class="threadhead"><button class="round" id="backList" style="display:none">‹</button><div class="avatar">${esc((title[0]||"E").toUpperCase())}</div><div class="details"><strong>${esc(title)}</strong><small dir="ltr">${esc(other)}</small></div><button class="round" id="chatInfo" title="معلومات">ⓘ</button></div><div class="messages" id="messages"><div class="empty">جارٍ تحميل الرسائل…</div></div><form class="composer" id="composer"><textarea id="messageInput" maxlength="4000" rows="1" placeholder="اكتب رسالتك…"></textarea><button class="send" id="sendButton" aria-label="إرسال">➤</button></form>`;$("backList").style.display=innerWidth<=760?"block":"none";$("backList").onclick=showList;$("chatInfo").onclick=()=>toast("المحادثة محفوظة في Firestore");$("composer").onsubmit=async e=>{e.preventDefault();await sendMessage()};const mq=query(collection(db,"chats",id,"messages"),orderBy("createdAt","asc"),limit(300));msgUnsub=onSnapshot(mq,snap=>{const msgs=snap.docs.map(d=>({id:d.id,...d.data()}));cache[id]=msgs.slice(-100);persist();renderMessages(msgs)},err=>{$("messages").innerHTML=`<div class="empty">${esc(errorText(err))}</div>`});}
-function renderMessages(msgs){const el=$("messages");if(!el)return;if(!msgs.length){el.innerHTML='<div class="empty">هذه بداية المحادثة. أرسل أول رسالة 👋</div>';return}el.innerHTML=msgs.map(m=>`<div class="bubble ${m.senderId===me.uid?"mine":"theirs"}">${esc(m.text||"")}<time>${m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():"جارٍ الحفظ"}</time></div>`).join("");el.scrollTop=el.scrollHeight}
-async function sendMessage(){const input=$("messageInput"),text=input.value.trim();if(!text||!active||!me)return;const btn=$("sendButton");btn.disabled=true;try{await addDoc(collection(db,"chats",active.id,"messages"),{text,senderId:me.uid,senderPhone:phone(),createdAt:serverTimestamp()});await setDoc(doc(db,"chats",active.id),{lastMessage:text.slice(0,120),updatedAt:serverTimestamp()},{merge:true});input.value=""}catch(e){toast("لم تُرسل الرسالة: "+errorText(e))}finally{btn.disabled=false;input.focus()}}
-$("newChat").onclick=newChat;$("searchChats").oninput=renderChats;start();
+
+function modal(title,body,submitText,fn){
+  $("overlay").innerHTML=`<div class="modalback"><div class="modal"><h3>${title}</h3>${body}<div class="modalactions"><button class="secondary" id="cancelModal">إلغاء</button><button class="primary" id="submitModal">${submitText}</button></div></div></div>`;
+  $("cancelModal").onclick=()=>$("overlay").innerHTML="";
+  $("submitModal").onclick=async()=>{try{await fn();}catch(e){toast(errorText(e))}}
+}
+
+function errorText(e){
+  const c=e?.code||"";
+  return ({
+    "permission-denied":"لا توجد صلاحية. تحقق من قواعد Firestore.",
+    "unavailable":"تعذّر الاتصال. تحقق من الإنترنت.",
+    "failed-precondition":"تأكد من إعداد فهارس Firestore.",
+    "auth/network-request-failed":"تعذّر الاتصال بخدمة تسجيل الدخول."
+  })[c]||e?.message||"حدث خطأ غير متوقع.";
+}
+
+function start(){
+  onAuthStateChanged(auth, user => {
+    me = user;
+    if(!user){
+      // توجيه صحيح لصفحة تسجيل الدخول لو لم يكن مسجلاً
+      location.replace("login.html");
+      return;
+    }
+    $("accountLabel").textContent = phone() || "حسابك";
+    $("welcome").style.display = "none";
+    $("globalHint").textContent = "أرسل واستقبل الرسائل بين حسابات Eisen SMS المسجّلة.";
+    loadChats();
+  });
+}
+
+function loadChats(){
+  unsubs.forEach(f=>f());unsubs=[];
+  const q1=query(collection(db,"chats"),where("members","array-contains",me.uid),orderBy("updatedAt","desc"),limit(100));
+  const unsub=onSnapshot(q1,snap=>{
+    people=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderChats();
+  },err=>{$("chatList").innerHTML=`<div class="empty">${esc(errorText(err))}<br>راجع إعدادات Firestore.</div>`});
+  unsubs.push(unsub);
+}
+
+function renderChats(){
+  const term=$("searchChats").value.trim().toLowerCase();
+  const rows=people.filter(c=>(c.memberPhones||[]).join(" ").toLowerCase().includes(term)||(c.memberNames||[]).join(" ").toLowerCase().includes(term));
+  if(!rows.length){$("chatList").innerHTML='<div class="empty">لا توجد محادثات بعد.<br>اضغط «＋ محادثة» للبدء.</div>';return}
+  $("chatList").innerHTML=rows.map(c=>{
+    const other=(c.memberPhones||[]).find(p=>p!==phone())||"محادثة";
+    const title=(c.memberNames||[]).find((n,i)=>(c.memberPhones||[])[i]!==phone())||other;
+    return `<div class="chatitem ${active?.id===c.id?"active":""}" data-id="${esc(c.id)}"><div class="avatar">${esc((title[0]||"E").toUpperCase())}</div><div class="chatmeta"><strong>${esc(title)}</strong><small>${esc(c.lastMessage||"ابدأ المحادثة")}</small></div></div>`
+  }).join("");
+  document.querySelectorAll(".chatitem").forEach(el=>el.onclick=()=>openChat(el.dataset.id));
+}
+
+async function newChat(){
+  modal("محادثة جديدة",'<label class="field">رقم هاتف المستخدم مع رمز الدولة<input id="newPhone" placeholder="+213555123456" inputmode="tel" dir="ltr" required></label><p style="color:#91a6c0;font-size:12px;line-height:1.7">يجب أن يكون الرقم مسجلاً في Eisen SMS.</p>',"متابعة",async()=>{
+    const raw=$("newPhone").value.trim().replace(/[\s()-]/g,"");
+    if(!/^\+[1-9]\d{7,14}$/.test(raw))throw new Error("أدخل رقم هاتف دولياً صحيحاً مثل +213XXXXXXXXX");
+    if(raw===phone())throw new Error("لا يمكنك بدء محادثة مع رقمك نفسه.");
+    const qs=await getDocs(query(collection(db,"users"),where("phoneNumber","==",raw),limit(1)));
+    if(qs.empty)throw new Error("لم نعثر على حساب مسجّل بهذا الرقم.");
+    const target=qs.docs[0].data(),targetUid=qs.docs[0].id;
+    const members=[me.uid,targetUid].sort();
+    const id=members.join("_");
+    const phones=[phone(),raw],names=[me.displayName||phone(),target.displayName||raw];
+    await setDoc(doc(db,"chats",id),{members,memberPhones:phones,memberNames:names,updatedAt:serverTimestamp(),lastMessage:""},{merge:true});
+    $("overlay").innerHTML="";
+    await openChat(id);
+    toast("تم فتح المحادثة");
+  });
+}
+
+async function openChat(id){
+  active=people.find(c=>c.id===id)||{id};
+  $("app").classList.add("thread-open");
+  if(msgUnsub)msgUnsub();
+  const c=active,other=(c.memberPhones||[]).find(p=>p!==phone())||"محادثة";
+  const title=(c.memberNames||[]).find((n,i)=>(c.memberPhones||[])[i]!==phone())||other;
+  $("thread").innerHTML=`<div class="threadhead"><button class="round" id="backList" style="display:none">‹</button><div class="avatar">${esc((title[0]||"E").toUpperCase())}</div><div class="details"><strong>${esc(title)}</strong><small dir="ltr">${esc(other)}</small></div><button class="round" id="chatInfo" title="معلومات">ⓘ</button></div><div class="messages" id="messages"><div class="empty">جارٍ تحميل الرسائل…</div></div><form class="composer" id="composer"><textarea id="messageInput" maxlength="4000" rows="1" placeholder="اكتب رسالتك…"></textarea><button class="send" id="sendButton" aria-label="إرسال">➤</button></form>`;
+  $("backList").style.display=innerWidth<=760?"block":"none";
+  $("backList").onclick=showList;
+  $("chatInfo").onclick=()=>toast("المحادثة محفوظة في Firestore");
+  $("composer").onsubmit=async e=>{e.preventDefault();await sendMessage()};
+  const mq=query(collection(db,"chats",id,"messages"),orderBy("createdAt","asc"),limit(300));
+  msgUnsub=onSnapshot(mq,snap=>{
+    const msgs=snap.docs.map(d=>({id:d.id,...d.data()}));
+    cache[id]=msgs.slice(-100);
+    persist();
+    renderMessages(msgs);
+  },err=>{$("messages").innerHTML=`<div class="empty">${esc(errorText(err))}</div>`});
+}
+
+function renderMessages(msgs){
+  const el=$("messages");if(!el)return;
+  if(!msgs.length){el.innerHTML='<div class="empty">هذه بداية المحادثة. أرسل أول رسالة 👋</div>';return}
+  el.innerHTML=msgs.map(m=>`<div class="bubble ${m.senderId===me.uid?"mine":"theirs"}">${esc(m.text||"")}<time>${m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():"جارٍ الحفظ"}</time></div>`).join("");
+  el.scrollTop=el.scrollHeight;
+}
+
+async function sendMessage(){
+  const input=$("messageInput"),text=input.value.trim();
+  if(!text||!active||!me)return;
+  const btn=$("sendButton");btn.disabled=true;
+  try{
+    await addDoc(collection(db,"chats",active.id,"messages"),{text,senderId:me.uid,senderPhone:phone(),createdAt:serverTimestamp()});
+    await setDoc(doc(db,"chats",active.id),{lastMessage:text.slice(0,120),updatedAt:serverTimestamp()},{merge:true});
+    input.value="";
+  }catch(e){
+    toast("لم تُرسل الرسالة: "+errorText(e));
+  }finally{
+    btn.disabled=false;
+    input.focus();
+  }
+}
+
+$("newChat").onclick=newChat;
+$("searchChats").oninput=renderChats;
+start();
 </script></body></html>
